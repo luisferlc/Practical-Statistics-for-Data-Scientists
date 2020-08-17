@@ -2,7 +2,9 @@
 title: "chapter4 - Regression and Prediction"
 author: "LuisF"
 date: "2/6/2020"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -25,7 +27,7 @@ Formula:
 
 
 ```{r}
-df <- read.table('D:/Documentos/R Projects/PSDS/datos_practical_statistics/LungDisease.csv', sep = ",", header = T)
+df <- read.table('D:/Documentos/R_Projects/PSDS/datos_practical_statistics/LungDisease.csv', sep = ",", header = T)
 head(df)
 model <- lm(PEFR	~	Exposure,	data=df)
 model #'linear model' te arroja el valor del intercepto y la pendiente.
@@ -69,9 +71,9 @@ https://projecteuclid.org/download/pdfview_1/euclid.ss/1294167961
 
 #### King County Housing Data
 ```{r houses}
-house <- read.table('D:/Documentos/R Projects/PSDS/datos_practical_statistics/house_sales.csv')
+house <- read.table('D:/Documentos/R_Projects/PSDS/datos_practical_statistics/house_sales.csv')
 head(house)
-house[, c("AdjSalePrice",	"SqFtTotLiving",	"SqFtLot",	"Bathrooms", "Bedrooms",	"BldgGrade")]
+head(house[, c("AdjSalePrice",	"SqFtTotLiving",	"SqFtLot",	"Bathrooms", "Bedrooms",	"BldgGrade")])
 house_lm	<-	lm(AdjSalePrice	~	SqFtTotLiving	+	SqFtLot	+	Bathrooms	+																	Bedrooms	+	BldgGrade,															data=house,	na.action=na.omit)
 house_lm
 ```
@@ -79,8 +81,8 @@ house_lm
 La más importante medida para evaluar un modelo de regresión es el RMSE (Root Mean Squared Error)/Error cuadrático medio. Que la formula es la raíz cuadrada de los  "residuals" al cuadrado entre "n":
 
 ```{r rmse}
-house$AdjSalePrice - predict(house_lm) == residuals(house_lm) #aunque no sean exactamente iguales...
-mean(house$AdjSalePrice - predict(house_lm) -  residuals(house_lm)) #practicamente lo son...
+head(house$AdjSalePrice - predict(house_lm) == residuals(house_lm)) #aunque no sean exactamente iguales...
+head(mean(house$AdjSalePrice - predict(house_lm) -  residuals(house_lm))) #practicamente lo son...
 #entonces es lo mismo hacer esto:
 house$residuales <- house$AdjSalePrice - predict(house_lm)
 #que esto:
@@ -89,7 +91,7 @@ house$residuales <- house$AdjSalePrice - predict(house_lm)
 #error cuadrático medio
 house$residuales2 <- house$residuales^2
 rmse <- sqrt(sum(house$residuales2)/nrow(house))
-rmse
+head(rmse)
 ```
 
 Similar al error cuadrático medio esta el error estandard, el cual, en lugar de utilizar 'n' como denominador, utiliza grados de confianza:
@@ -123,11 +125,11 @@ Ahora, irte creando modelo tras modelo, cambiando variables al tanteo, puede ser
 #creas un modelo con más variables que el anterior
 house_full	<-	lm(AdjSalePrice	~	SqFtTotLiving	+	SqFtLot	+ Bathrooms	+ Bedrooms	+	BldgGrade	+	PropertyType	+	NbrLivingUnits	+ SqFtFinBasement	+	YrBuilt	+	YrRenovated	+ NewConstruction, data=house,	na.action=na.omit)
 
-library(MASS)
-step	<-	stepAIC(house_full,	direction="both")
-step
+#library(MASS)
+#step	<-	stepAIC(house_full,	direction="both")
+#step
 
-?stepAIC
+#?stepAIC
 #Notas de la función stepAIC:
 #forward direction: empieza con 0 variables y va agregando 1 x 1 con base a su R2. Termina de evaluar cuando el modelo se convierte en no significativo ???????
 
@@ -154,7 +156,7 @@ En lugar de utilizar una métrica como la media para obtener intervalos de confi
 
 ¿Cómo convertirlas a dummy?
 ```{r}
-house <- read.table('D:/Documentos/R Projects/PSDS/datos_practical_statistics/house_sales.csv')
+house <- read.table('D:/Documentos/R_Projects/PSDS/datos_practical_statistics/house_sales.csv')
 #head(house)
 #house[, c("AdjSalePrice",	"SqFtTotLiving",	"SqFtLot",	"Bathrooms", "Bedrooms",	"BldgGrade")]
 #valuecounts:
@@ -184,10 +186,12 @@ zip_groups <- house	%>%
                 summarise(med_resid	=	median(resid),
                           cnt	=	n())	%>%		
                 arrange(med_resid)	%>%		
-                mutate(cum_cnt	=	cumsum(cnt), ZipGroup	=	ntile(cum_cnt,	5)) 
+                mutate(cum_cnt	=	cumsum(cnt), 
+                       ZipGroup	=	ntile(cum_cnt,	5)) 
 
-house <- house	%>% left_join(select(zip_groups, ZipCode, ZipGroup), by='ZipCode')
-house
+house <- house %>% 
+      left_join(select(zip_groups, ZipCode, ZipGroup),by='ZipCode')
+head(house)
 #?cumsum
 ```
 
