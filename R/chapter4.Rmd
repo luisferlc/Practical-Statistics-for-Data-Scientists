@@ -1,0 +1,263 @@
+---
+title: "chapter4 - Regression and Prediction"
+author: "LuisF"
+date: "2/6/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+### Regresión Logística Simple
+Modela la relación entre ña magnitud de una variable 'x' y una 'y'. Por ejemplo, si x aumenta y aumenta y visceversa. La correlación entre dos variables mide lo mismo, sin embargo, la regresión incluye la cuantificación de la naturaleza de esa relación, además de la fuerza con la que se co-re-lacionan.
+
+Formula:
+
+- Y: variable dependiente o lo que vas a predecir
+- x: variable independiente
+- b0: intercepto, es el valor de 'y' cuando el valor de las variables independientes es igual a 0. ¿Qué pasa si tienes un modelo con x's que no puede ser 0 (como la edad)?
+  - En ese caso puedes 'centrar' a los predictores y en ese caso, tu valor para centrar se convierte en el intercepto
+  - Leyendo un poco sobre este concepto, es inusual que te pueda servir para interpretar los datos. Generalmente, solo funciona para que tu ecuación de regresión prediga bien los valores. sin embargo, hay varios escenarios en donde se puede interpretar (qué pasa con tu modelo si tienes x-categóricas o x-dummies?)
+
+- b1: The slope of a regression line (b) represents the rate of change in y as x changes. Because y is dependent on x, the slope describes the predicted values of y given x. When using the ordinary least squares method, one of the most common linear regressions, slope, is found by calculating b as the covariance of x and y, divided by the sum of squares (variance) of x, 
+
+
+```{r}
+df <- read.table('D:/Documentos/R Projects/PSDS/datos_practical_statistics/LungDisease.csv', sep = ",", header = T)
+head(df)
+model <- lm(PEFR	~	Exposure,	data=df)
+model #'linear model' te arroja el valor del intercepto y la pendiente.
+#predict(model) #los valores de y-hat
+#residuals(model) #residuales: valor original - valor predicción
+```
+
+#### Mínimos cuadrados
+Método que minimiza los residuales (Residual Sum of Squares) y permite encontrar b0 y b1.
+
+Comparando los resultados de la función lm y mínimos cuadrados:
+
+Mínimos cuadrados pagina web:
+```{r pagina web}
+#https://miprofe.com/minimos-cuadrados/
+head(df)
+df$xy <- df$PEFR * df$Exposure
+df$x2 <- df$PEFR^2
+
+b1 <- (sum(df$xy) - nrow(df) * mean(df$PEFR) * mean(df$Exposure)) / (sum(df$x2) - nrow(df)*mean(df$PEFR)^2)
+b0 <- mean(df$Exposure) - b1*mean(df$PEFR)
+
+```
+
+Mínimos cuadrados formula libro:
+```{r libro}
+head(df)
+df$residual <- df$Exposure - mean(df$Exposure)
+df$xresid <- df$PEFR - mean(df$PEFR)
+df$xresid2 <- df$xresid^2
+
+sum(df$residual)*sum(df$xresid)/sum(df$xresid2)
+
+
+```
+
+"To explain or to predict"
+https://projecteuclid.org/download/pdfview_1/euclid.ss/1294167961
+
+### Regresión lineal múltiple
+
+#### King County Housing Data
+```{r houses}
+house <- read.table('D:/Documentos/R Projects/PSDS/datos_practical_statistics/house_sales.csv')
+head(house)
+house[, c("AdjSalePrice",	"SqFtTotLiving",	"SqFtLot",	"Bathrooms", "Bedrooms",	"BldgGrade")]
+house_lm	<-	lm(AdjSalePrice	~	SqFtTotLiving	+	SqFtLot	+	Bathrooms	+																	Bedrooms	+	BldgGrade,															data=house,	na.action=na.omit)
+house_lm
+```
+#### Evaluando el modelo
+La más importante medida para evaluar un modelo de regresión es el RMSE (Root Mean Squared Error)/Error cuadrático medio. Que la formula es la raíz cuadrada de los  "residuals" al cuadrado entre "n":
+
+```{r rmse}
+house$AdjSalePrice - predict(house_lm) == residuals(house_lm) #aunque no sean exactamente iguales...
+mean(house$AdjSalePrice - predict(house_lm) -  residuals(house_lm)) #practicamente lo son...
+#entonces es lo mismo hacer esto:
+house$residuales <- house$AdjSalePrice - predict(house_lm)
+#que esto:
+#house$residuales <- residuals(house_lm)
+
+#error cuadrático medio
+house$residuales2 <- house$residuales^2
+rmse <- sqrt(sum(house$residuales2)/nrow(house))
+rmse
+```
+
+Similar al error cuadrático medio esta el error estandard, el cual, en lugar de utilizar 'n' como denominador, utiliza grados de confianza:
+```{r rse}
+#RSE(Residual standard error) 
+rse <- sqrt(sum(house$residuales2)/nrow(house)-1)
+rse
+summary(house_lm) #el "Residual standard error que arroja la función de lm es = a 261,200 vs 261,209 de nuestro calculo a mano tanto para rmse y rse... good
+```
+
+El autor menciona que en la práctica no hay diferencia para estos dos parámetros...
+
+Otra medida de evaluación es el 'coeficiente de determinación' o R-cuadrado, el cual mide la proporción de variabilidad entre lo predicho y los valores reales:
+```{r r2}
+#house$residuales2 #se utilizara esta info, y...
+house$difmean2 <- (house$AdjSalePrice - mean(house$AdjSalePrice))^2
+#r-cuadrado
+r2 <- 1 - (sum(house$residuales2)/sum(house$difmean2)) 
+r2
+summary(house_lm) #el r2 de la fórmula tambien utiliza grados de confianza, y dio muy similar al que calculamos a manopla.
+```
+#### Cross-Validation/Validación Cruzada
+Ya ves que cuando entrenas un modelo lo haces solo con un % de los datos, para después correr el modelo en el % restante y evaluarlo bajo datos que no había visto. La idea de este método es utilizar distintos sampleos para entrenar y evaluar, y no solo quedarte con una corrida por asi decirlo. Es importante recalcar que, cuando vayas a realizar la 2da, 3er o 'n' corrida, los datos que decidiste dejar fuera para luego evaluar con ellos, no pueden ser elegidos para la siguiente corrida.
+
+#### Model selection and Step-wise regression
+En este apartado te exponen el AIC(Akaike's Information Criteria), la cual es una métrica para evaluar el comportamiento de tu modelo de REGRESION: entre menor sea este valor, mejor es el modelo (existen otras métricas aparte de esta como por ejemplo BIC or Bayesian y Mallows CP, sin embargo, menciona el autor que no tienen mucha diferencia para el campo de ciencia de datos).
+
+Ahora, irte creando modelo tras modelo, cambiando variables al tanteo, puede ser tedioso, y por otro lado, utilizar el 'subset regresion' el cual es un metodo para probar todos los posibles modelos, puede ser muy demandante para un set de datos 'big'. Para esto, se utiliza 'setpwise regression', el cual es un método que añade y dropea varialbes para encontrar el menor AIC:
+
+```{r stepwise}
+#creas un modelo con más variables que el anterior
+house_full	<-	lm(AdjSalePrice	~	SqFtTotLiving	+	SqFtLot	+ Bathrooms	+ Bedrooms	+	BldgGrade	+	PropertyType	+	NbrLivingUnits	+ SqFtFinBasement	+	YrBuilt	+	YrRenovated	+ NewConstruction, data=house,	na.action=na.omit)
+
+library(MASS)
+step	<-	stepAIC(house_full,	direction="both")
+step
+
+?stepAIC
+#Notas de la función stepAIC:
+#forward direction: empieza con 0 variables y va agregando 1 x 1 con base a su R2. Termina de evaluar cuando el modelo se convierte en no significativo ???????
+
+#Ya metiendo un poco más en la confiabilidad de este método, me encontre con esto:
+#https://stats.stackexchange.com/questions/20836/algorithms-for-automatic-model-selection/20856#20856
+#aca, al final de cuentas encontre un comentario que menciona el uso de 'caret', una librería en R para validación cruzada. La intención es usar validación cruzada para tu stepwise.
+
+#En resumen puedo decir que utilizar estos métodos automatizados para encontrar un modelo óptimo, tienen que ir de la mano de otras validaciones para evitar biases (overfitting). Estos métodos, al contrario, pueden servirte como un primer acercamiento a datos con muchas variables.
+```
+
+#### Weighted Regresssion
+No me metí a fondo como funciona esto, pero la función 'lm' tiene un parámetro que se llama 'weight', el cual puedes utilizar para dar más relevancia a ciertos datos. Por ejemplo, si quieres predecir el precio de una casa, los datos que contengan precios más actuales pueden que den más relevancia para un modelo actualizado al día de hoy.
+
+### Prediction using Regression
+Para la ciencia de datos, la regresión lineal se utiliza principalmente para la predicción de un valor
+
+#### Los peligros de Extrapolar
+Un modelo de regresión solo tendra sentido cuando le metas datos que esten dentro del rango de los datos utilizados para su entrenamiento. Es decir, si quieres predecir el precio de una casa para variables x = a 0, el precio no tendra sentido, ya que no hay casas que cuesten 0 pesos en tu dataset (eso se esperaría)
+
+#### Intervalos de confianza y predicción
+En lugar de utilizar una métrica como la media para obtener intervalos de confianza, que te permiten medir la variabilidad del modelo, utilizas los coeficientes del modelo para crear estos intervalos, utilizando bootstrap (sampleos con reemplazo). Además de hacerlo de esta manera, también puedes hacerlo mediante el 'individual data point error', en donde corres tu módelo y tomas un 'x' data point de tus residuals y lo sumas a tu valor predicho. Haces esto 10000 (n) veces y sacas percentiles (5 - 95)
+
+### Variables categóricas
+
+¿Cómo convertirlas a dummy?
+```{r}
+house <- read.table('D:/Documentos/R Projects/PSDS/datos_practical_statistics/house_sales.csv')
+#head(house)
+#house[, c("AdjSalePrice",	"SqFtTotLiving",	"SqFtLot",	"Bathrooms", "Bedrooms",	"BldgGrade")]
+#valuecounts:
+aggregate(data.frame(count = house$PropertyType),       # Apply aggregate function
+          list(value = house$PropertyType),
+          length)
+#Entonces podemos ver que hay 3 valores únicos para "tipo de propiedad"
+
+##Ahora convirtiendo a dummy:
+
+#De esta manera lo puedes hacer manual
+prop_type_dummies <- model.matrix(~PropertyType -1,	data=house)
+head(prop_type_dummies)
+#?model.matrix
+
+#Pero, la función 'lm' lo hace automáticamente y omite el primer nivel de cada variable categórica, por el tema de redundancia:
+lm(AdjSalePrice	~	SqFtTotLiving	+	SqFtLot	+	Bathrooms	+ Bedrooms	+		BldgGrade	+	PropertyType,	data=house)
+#si te fijas en los coeficientes que arroja el modelo, el factor "Multiplex" no aparece.
+```
+#### ¿Qué pasa cuando tienes muchos niveles en un factor?
+Como por ejemplo, varios códigos postales:
+
+```{r}
+zip_groups <- house	%>%		
+                mutate(resid	=	residuals(house_lm))	%>%		
+                group_by(ZipCode)	%>%	
+                summarise(med_resid	=	median(resid),
+                          cnt	=	n())	%>%		
+                arrange(med_resid)	%>%		
+                mutate(cum_cnt	=	cumsum(cnt), ZipGroup	=	ntile(cum_cnt,	5)) 
+
+house <- house	%>% left_join(select(zip_groups, ZipCode, ZipGroup), by='ZipCode')
+house
+#?cumsum
+```
+
+```{r}
+#Justificación de la fórmula para crear los grupos anteriores:
+
+#La idea es usar los residuales (los cuales son errores en los precios de venta(y)) y ver qué códigos postales tienen una mediana por debajo o arriba del verdadero precio de venta. Esto nos va decir que zonas geográficas, en promedio, tienen precios de venta por encima o por debajo de lo real, según nuestro modelo.
+### Quisiera saber cuál seria la diferencia de hacer esta agrupación directamente con los precios reales y no con los residuales.
+house %>%
+  group_by(ZipCode) %>%
+  mutate(me = mean(SalePrice),
+            counte = n())
+#Lo que hace esta parte del código es ir acumulando los conteos individuales de los códigos postales.
+?ntile
+
+#¿Cuántos valores quedaorn para cada grupo de zipcode?
+aggregate(data.frame(count = house$ZipGroup),       # Apply aggregate function
+          list(value = house$ZipGroup),
+          length)
+```
+
+### Interpretando la ecuación de regresión
+
+#### Correlación entre los predictores
+
+En el libro se muestra un ejemplo en código del efecto que puede tener correr un modelo con varias variables correlacionadas. Se explica con el tema de el 'precio de las casas'. Cuando tu estas prediciendo el precio de una casa, es lógico pensasr que entre más grande sea una casa, más cara sera. Para este caso, el modelo 'stepwise' que se corrio tiene la variables de 'cuartos', 'baños' y las de 'metros cuadrados'. Todas estas variables hacen referencia al tamaño de una casa, por lógica, ya que entre más 'x' más grande será la casa. Entonces, para este modelo stepwise el coeficiente de 'baños' dio negativo, yendo en contra de la lógica común, y es que el hecho de tener varias variables correlacionadas entre sí, te va impedir tener un modelo fácil de interpretar con la realidad.
+
+Para esto, el autor saca de la ecuación 'n-1' variables correlacionadas y deja 1, que siguiendo la lógica de 'entre más grande más cara', el coeficiente tiene que dar positivo.
+
+- Nota: el tema de Multicolinealidad es cuando hay muchos predictores correlacionados o, de plano, predictores repetidos (como por ejemplo todos los niveles de un one-hot-encoder, en lugar de n-1)
+
+### Variables 'confusas' (confounding variables)
+
+El libro menciona el ejemplo de cuando se corre el modelo sin utilizar la variable de grupos de zipcode, en el cual, los coeficientes para 'metros cuadrados', 'baños y 'cuartos, dan negativo, algo fuera del sentido común. Pero, al momento de agregar los zipcodes, estas variables ahora pasan a ser positivas. 
+El concepto de varibles confusas hace alusión a aquellas variables que se sabe por lógica o sentido común que tienen un efecto positivo en 'y', pero en tu modelo salen negativas. La pregunta sería, ¿qué diferencia hace esta variable de ubicación en el modelo para que ahora si las tomará positivas? Sin duda alguna la variable de ubicación influye mucho en el precio de una casa, pero, es que acaso los algoritmos también tienen sentido común?
+
+### Testing	the	Assumptions:	Regression	Diagnostics
+Estas indicaciones no sirven para medir la precisión de una predicción, pero dan visión para ello.
+
+#### Outliers
+
+Se menciona del outlier de regresión: tu 'y-hat' es mucho menor o mayor que tu 'y-real'. Puedes detectar estos outliers mediante el 'residual estandarizado', el cual es = residual/error estándar de los residuales. Este residual estándar se interpreta como 'el número de errores estándar alejados de la línea de regresión'.
+
+Definiendo los conceptos que participan para el residual estandarizado:
+- standarized residual: la desviación estándar de los puntos con respecto a la línea de regresión. O, número de errores estándar alejados de la línea de regresión.
+- Error estándar: se utiliza bajo una muestra para estimar a la población. Es la desviación estándar de una estadístico(media, mediana...).
+
+```{r}
+house_98105 <- house[house$ZipCode == 98105,] 
+lm_98105	<-	lm(AdjSalePrice	~	SqFtTotLiving	+	SqFtLot	+	Bathrooms	+	Bedrooms + BldgGrade, data=house_98105)
+
+#obtenemos los residuales estándar:
+
+#mediante fórmula precargada:
+sresid	<-	rstandard(lm_98105)
+idx	<-	order(sresid)
+sresid[idx[1]]
+
+#a manopla:
+# residual/error estándar de los residuales
+
+#varianza
+sum((house_98105$AdjSalePrice - mean(house_98105$AdjSalePrice))^2) / (nrow(house_98105)-1)
+var(house_98105$AdjSalePrice)
+
+#desviación estándar
+sqrt(sum((house_98105$AdjSalePrice - mean(house_98105$AdjSalePrice))^2) / (nrow(house_98105)-1))
+sd(house_98105$AdjSalePrice)
+
+
+```
+
+
